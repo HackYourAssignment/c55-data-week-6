@@ -13,78 +13,183 @@ Reference chapters:
 - Container Job:    Data Track/Week 6/week_6__5_container_apps_jobs.md
 """
 
+import json
 import logging
 import os
-from datetime import date
+from contextlib import closing
+from datetime import date, datetime, timezone
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+import psycopg2
+from azure.storage.blob import BlobServiceClient
+from psycopg2.extras import execute_values
+
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(levelname)s %(message)s",
+)
+
+# Required by the assignment: silence noisy Azure SDK logs.
+logging.getLogger("azure").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
+SCHEMA_NAME = "dev_mohammedalfakih"
+TABLE_NAME = "weather_readings"
 # TASK 3 hint: quiet the Azure SDK so its DEBUG output does not drown your own
 # pipeline logs. The right call lives in Chapter 5 (Viewing logs).
+
+def ensure_sslmode_require(postgres_url: str) -> str:
+    """Ensure Azure Postgres connection string uses sslmode=require."""
+    parts = urlsplit(postgres_url)
+    query = dict(parse_qsl(parts.query))
+
+    if "sslmode" not in query:
+        query["sslmode"] = "require"
+
+    return urlunsplit(
+        (
+            parts.scheme,
+            parts.netloc,
+            parts.path,
+            urlencode(query),
+            parts.fragment,
+        )
+    )
 
 
 def get_config() -> dict:
     """Return configuration read from environment variables.
 
     Required:
-        - POSTGRES_URL: full Azure Postgres connection string.
-        - AZURE_STORAGE_CONNECTION_STRING: blob storage account connection string.
+        POSTGRES_URL
+        AZURE_STORAGE_CONNECTION_STRING
 
     Optional:
-        - SOURCE_NAME: logical source label, default "weather".
-        - LOG_LEVEL: not parsed here; the orchestrator sets it via env var.
-
-    Raise RuntimeError with a clear message if a required variable is missing.
+        SOURCE_NAME, default "weather"
     """
-    raise NotImplementedError(
-        "Task 3: read POSTGRES_URL and AZURE_STORAGE_CONNECTION_STRING from os.environ"
-    )
+    postgres_url = os.getenv("POSTGRES_URL")
+    blob_conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+
+    missing = []
+    if not postgres_url:
+        missing.append("POSTGRES_URL")
+    if not blob_conn_str:
+        missing.append("AZURE_STORAGE_CONNECTION_STRING")
+
+    if missing:
+        raise RuntimeError(
+            f"Missing required environment variables: {', '.join(missing)}"
+        )
+
+    return {
+        "postgres_url": ensure_sslmode_require(postgres_url),
+        "azure_storage_connection_string": blob_conn_str,
+        "source_name": os.getenv("SOURCE_NAME", "weather"),
+    }
 
 
 def fetch_records() -> list[dict]:
-    """Return a small batch of records to ingest.
+    """Return a small batch of weather records to ingest."""
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
-    In a real pipeline you would call an API here. Return a list of at least
-    one dict with a stable key set (for example: station, timestamp,
-    temperature_c, humidity_pct).
-    """
-    raise NotImplementedError("Task 3: return a list of at least one record")
+    return [
+        {
+            "station": "Open-Meteo Copenhagen",
+            "timestamp": now,
+            "temperature_c": 12.5,
+            "humidity_pct": 80,
+        },
+        {
+            "station": "Open-Meteo Amsterdam",
+            "timestamp": now,
+            "temperature_c": 10.8,
+            "humidity_pct": 75,
+        },
+    ]
 
 
 def upload_raw_to_blob(records: list[dict], blob_conn_str: str, source: str) -> str:
-    """Upload the raw records as a single JSON blob and return its name.
+    """Upload raw records as JSON to Azure Blob Storage."""
+    blob_name = f"raw/{source}/{date.today().isoformat()}.json"
 
-    The blob name must follow the assignment convention:
-        raw/<source>/<YYYY-MM-DD>.json
+    service = BlobServiceClient.from_connection_string(blob_conn_str)
+    blob_client = service.get_blob_client(
+        container="raw",
+        blob=blob_name,
+    )
 
-    Use the azure-storage-blob SDK. The target container is "raw" (your
-    teacher has pre-created it). Overwrite if the blob already exists so
-    same-day reruns succeed.
-    """
-    raise NotImplementedError("Task 1 + Task 3: upload records to blob storage")
+    payload = json.dumps(records, indent=2)
+
+    blob_client.upload_blob(
+        payload,
+        overwrite=True,
+        content_type="application/json",
+    )
+
+    return blob_name
+
 
 
 def write_to_postgres(records: list[dict], postgres_url: str) -> int:
-    """Insert (or upsert) records into Azure Postgres. Return the row count.
+    """Upsert weather readings into Azure Postgres and return row count."""
+    with closing(psycopg2.connect(postgres_url)) as conn:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME}")
+                cur.execute(f"SET search_path TO {SCHEMA_NAME}")
 
-    Steps:
-        1. Open a psycopg2 connection wrapped so it is closed cleanly when the
-           function returns, even on error.
-        2. Ensure the target table exists (create it if missing).
-        3. Insert each record. The pipeline must be safe to rerun on the same
-           day: a re-run must update rather than fail.
-        4. Commit and return the number of rows written.
+                cur.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                        station TEXT NOT NULL,
+                        timestamp TIMESTAMPTZ NOT NULL,
+                        temperature_c DOUBLE PRECISION NOT NULL,
+                        humidity_pct INTEGER NOT NULL,
+                        ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (station, timestamp)
+                    )
+                    """
+                )
 
-    See Chapter 4 for the connection-and-cursor pattern this is based on.
-    """
-    raise NotImplementedError("Task 2 + Task 3: insert rows into Azure Postgres")
+                rows = [
+                    (
+                        record["station"],
+                        record["timestamp"],
+                        record["temperature_c"],
+                        record["humidity_pct"],
+                    )
+                    for record in records
+                ]
+
+                execute_values(
+                    cur,
+                    f"""
+                    INSERT INTO {TABLE_NAME} (
+                        station,
+                        timestamp,
+                        temperature_c,
+                        humidity_pct
+                    )
+                    VALUES %s
+                    ON CONFLICT (station, timestamp)
+                    DO UPDATE SET
+                        temperature_c = EXCLUDED.temperature_c,
+                        humidity_pct = EXCLUDED.humidity_pct,
+                        ingested_at = NOW()
+                    """,
+                    rows,
+                )
+
+    return len(records)
 
 
 def run() -> None:
     config = get_config()
     logger.info("starting pipeline")
     records = fetch_records()
+    logger.info("fetched %d records", len(records))
 
     blob_name = upload_raw_to_blob(
         records,
