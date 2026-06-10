@@ -13,12 +13,11 @@ Reference chapters:
 - Container Job:    Data Track/Week 6/week_6__5_container_apps_jobs.md
 """
 
-import csv
-import io
 import json
 import logging
 import os
 from datetime import date
+import sys
 from zipfile import Path
 import psycopg2
 from azure.storage.blob import BlobServiceClient
@@ -27,7 +26,16 @@ from contextlib import closing
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+logging.getLogger("azure").setLevel(logging.WARNING)
 
+CREATE_WEATHER_READINGS_SQL = """
+CREATE TABLE IF NOT EXISTS weather_readings (
+    id SERIAL PRIMARY KEY,
+    station TEXT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL,
+    temperature_c DOUBLE PRECISION NOT NULL
+)
+"""
 
 # TASK 3 hint: quiet the Azure SDK so its DEBUG output does not drown your own
 # pipeline logs. The right call lives in Chapter 5 (Viewing logs).
@@ -46,9 +54,28 @@ def get_config() -> dict:
 
     Raise RuntimeError with a clear message if a required variable is missing.
     """
-    raise NotImplementedError(
-        "Task 3: read POSTGRES_URL and AZURE_STORAGE_CONNECTION_STRING from os.environ"
-    )
+    POSTGRES_URL = os.environ.get("POSTGRES_URL")
+    AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+    SOURCE_NAME = os.environ.get("SOURCE_NAME", "weather")
+
+    missing = []
+    if not POSTGRES_URL:
+        missing.append("POSTGRES_URL")
+    if not AZURE_STORAGE_CONNECTION_STRING:
+        missing.append("AZURE_STORAGE_CONNECTION_STRING")
+    if not SOURCE_NAME:
+        missing.append("SOURCE_NAME")
+    if missing:
+        print(
+            f"Error: missing environment variable(s): {', '.join(missing)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return {
+        "postgres_url": POSTGRES_URL,
+        "azure_storage_connection_string": AZURE_STORAGE_CONNECTION_STRING,
+        "source_name": SOURCE_NAME,
+    }
 
 
 def fetch_records() -> list[dict]:
@@ -58,7 +85,20 @@ def fetch_records() -> list[dict]:
     one dict with a stable key set (for example: station, timestamp,
     temperature_c, humidity_pct).
     """
-    raise NotImplementedError("Task 3: return a list of at least one record")
+    return [
+        {
+            "station": "STATION_1",
+            "timestamp": "2024-06-01T12:00:00Z",
+            "temperature_c": 25.0,
+            "humidity_pct": 60.0,
+        },
+        {
+            "station": "STATION_2",
+            "timestamp": "2024-06-01T12:05:00Z",
+            "temperature_c": 26.5,
+            "humidity_pct": 55.0,
+        },
+    ]
 
 
 def upload_raw_to_blob(records: list[dict], blob_conn_str: str, source: str) -> str:
@@ -74,7 +114,7 @@ def upload_raw_to_blob(records: list[dict], blob_conn_str: str, source: str) -> 
     service = BlobServiceClient.from_connection_string(blob_conn_str)
     container = service.get_container_client("raw")
     data = json.dumps(records)
-    blob_name = f"raw/{source}/{date.today().isoformat()}.json"
+    blob_name = f"{source}/{date.today().isoformat()}.json"
     container.upload_blob(name=blob_name, data=data, overwrite=True)
     return blob_name
 
@@ -92,6 +132,21 @@ def write_to_postgres(records: list[dict], postgres_url: str) -> int:
 
     See Chapter 4 for the connection-and-cursor pattern this is based on.
     """
+    with closing(psycopg2.connect(postgres_url)) as conn:
+        with conn.cursor() as cur:
+            cur.execute("CREATE SCHEMA IF NOT EXISTS dev_bader;")
+            cur.execute("SET search_path TO dev_bader;")
+            cur.execute(CREATE_WEATHER_READINGS_SQL)
+            for row in records:
+                cur.execute(
+                    """
+                        INSERT INTO weather_readings (station, timestamp, temperature_c)
+                        VALUES (%s, %s, %s)
+                        """,
+                    (row["station"], row["timestamp"], float(row["temperature_c"])),
+                )
+                conn.commit()
+            return len(records)
 
 
 def run() -> None:
