@@ -1,13 +1,2 @@
-# Task 2 + Task 3: pin every dependency the pipeline uses.
-#
-# Format: package==version. Look up the latest stable version with:
-#   pip index versions <package>
-#
-# The pipeline needs the Azure Blob SDK and a Postgres driver. Add them below
-# with explicit pins.
-
-# TODO: pin azure-storage-blob (uncomment and add a version)
-# azure-storage-blob==
-
-# TODO: pin psycopg2-binary (uncomment and add a version)
-# psycopg2-binary==
+azure-storage-blob==12.22.0
+psycopg2-binary==2.9.9
