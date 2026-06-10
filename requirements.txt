@@ -6,8 +6,8 @@
 # The pipeline needs the Azure Blob SDK and a Postgres driver. Add them below
 # with explicit pins.
 
-# TODO: pin azure-storage-blob (uncomment and add a version)
-# azure-storage-blob==
+azure-storage-blob==12.14.0
 
-# TODO: pin psycopg2-binary (uncomment and add a version)
-# psycopg2-binary==
+psycopg2-binary==2.9.10
+
+six==1.16.0

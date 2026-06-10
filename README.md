@@ -58,18 +58,16 @@ set -a && source .env && set +a
 python -m src.pipeline
 ```
 
-## Verifying your deployment (Task 5)
+## Verification
 
-After deploying the Container App Job and triggering a run, capture proof:
+![Execution history](docs/execution_history.png)
 
-1. Open the Azure portal, find your Container App Job, open the **Execution
-   history** blade.
-2. Screenshot the most recent successful run.
-3. Save the screenshot to `docs/`.
-4. Replace this whole section with one called `## Verification` and embed
-   your screenshot using a Markdown image link. The grader looks for the
-   `## Verification` heading and a `![alt](docs/your-file.png)` reference
-   pointing at the image you committed.
+Verification commands:
+
+```bash
+az containerapp job execution list --name halyna1995-job --resource-group rg-hyf-data --output table
+
+az storage blob list --account-name hyfstoragedev --container-name raw --auth-mode login --output table
 
 ## Check your score locally
 

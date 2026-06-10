@@ -17,8 +17,22 @@ import logging
 import os
 from datetime import date
 
+import json
+from contextlib import closing
+
+try:
+    import psycopg2  # type: ignore[import]
+except ImportError as exc:
+    raise ImportError(
+        """psycopg2 is required to run this pipeline. 
+        Install it with `pip install psycopg2-binary`."""
+    ) from exc
+from azure.storage.blob import BlobServiceClient
+
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+logging.getLogger("azure").setLevel(logging.WARNING)
 
 # TASK 3 hint: quiet the Azure SDK so its DEBUG output does not drown your own
 # pipeline logs. The right call lives in Chapter 5 (Viewing logs).
@@ -37,9 +51,24 @@ def get_config() -> dict:
 
     Raise RuntimeError with a clear message if a required variable is missing.
     """
-    raise NotImplementedError(
-        "Task 3: read POSTGRES_URL and AZURE_STORAGE_CONNECTION_STRING from os.environ"
-    )
+
+    postqres_url = os.environ.get("POSTGRES_URL")
+    storage_connection = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+    source_name = os.environ.get("SOURCE_NAME", "weather")
+
+    missing = []
+    if not postqres_url:
+        missing.append("POSTGRES_URL")
+    if not storage_connection:
+        missing.append("AZURE_STORAGE_CONNECTION_STRING")
+    if missing:
+        raise RuntimeError(f"Missing environment variables: {', '.join(missing)}")
+
+    return {
+        "postgres_url": postqres_url,
+        "azure_storage_connection": storage_connection,
+        "source_name": source_name,
+    }
 
 
 def fetch_records() -> list[dict]:
@@ -49,7 +78,14 @@ def fetch_records() -> list[dict]:
     one dict with a stable key set (for example: station, timestamp,
     temperature_c, humidity_pct).
     """
-    raise NotImplementedError("Task 3: return a list of at least one record")
+    return [
+        {
+            "station": "Eindhoven",
+            "timestamp": f"{date.today().isoformat()}T6:00:00Z",
+            "temperature_c": 18.5,
+            "humidity_pct": 72,
+        }
+    ]
 
 
 def upload_raw_to_blob(records: list[dict], blob_conn_str: str, source: str) -> str:
@@ -62,7 +98,15 @@ def upload_raw_to_blob(records: list[dict], blob_conn_str: str, source: str) -> 
     teacher has pre-created it). Overwrite if the blob already exists so
     same-day reruns succeed.
     """
-    raise NotImplementedError("Task 1 + Task 3: upload records to blob storage")
+    blob_name = f"raw/{source}/{date.today().isoformat()}.json"
+    client = BlobServiceClient.from_connection_string(blob_conn_str)
+    container_client = client.get_container_client("raw")
+
+    data = json.dumps(records, indent=2).encode("utf-8")
+
+    container_client.upload_blob(blob_name, data, overwrite=True)
+
+    return blob_name
 
 
 def write_to_postgres(records: list[dict], postgres_url: str) -> int:
@@ -78,17 +122,52 @@ def write_to_postgres(records: list[dict], postgres_url: str) -> int:
 
     See Chapter 4 for the connection-and-cursor pattern this is based on.
     """
-    raise NotImplementedError("Task 2 + Task 3: insert rows into Azure Postgres")
+    with closing(psycopg2.connect(postgres_url)) as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS weather (
+                    station TEXT,
+                    timestamp TIMESTAMPTZ,
+                    temperature_c REAL,
+                    humidity_pct REAL,
+                    PRIMARY KEY (station, timestamp)
+                )
+                """
+            )
+
+            for record in records:
+                cursor.execute(
+                    """
+                    INSERT INTO weather (
+                    station, timestamp, temperature_c, humidity_pct
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (station, timestamp) DO UPDATE
+                    SET temperature_c = EXCLUDED.temperature_c,
+                        humidity_pct = EXCLUDED.humidity_pct
+                    """,
+                    (
+                        record["station"],
+                        record["timestamp"],
+                        record["temperature_c"],
+                        record["humidity_pct"],
+                    ),
+                )
+
+        conn.commit()
+        return len(records)
 
 
 def run() -> None:
+    """Run the pipeline end to end."""
     config = get_config()
     logger.info("starting pipeline")
     records = fetch_records()
 
     blob_name = upload_raw_to_blob(
         records,
-        config["azure_storage_connection_string"],
+        config["azure_storage_connection"],
         config["source_name"],
     )
     logger.info("uploaded blob %s", blob_name)
