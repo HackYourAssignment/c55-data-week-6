@@ -30,14 +30,14 @@ data-assignment-week-6/
 
 ## Where to start
 
-| Step | File | Task in the chapter |
-|---|---|---|
-| 1 | `requirements.txt` | Pin `azure-storage-blob` and `psycopg2-binary` |
-| 2 | `src/pipeline.py` | Implement `get_config`, `upload_raw_to_blob`, `write_to_postgres` (Tasks 1-3) |
-| 3 | `Dockerfile` | Finish the cache-friendly image (Task 4) |
-| 4 | Azure CLI | Deploy as a Container App Job (Task 4-5) |
-| 5 | `docs/execution_history.png` | Add the Execution-history portal screenshot (Task 5) |
-| 6 | `AI_ASSIST.md` | Fill in your AI prompt + review (Task 7) |
+| Step | File                         | Task in the chapter                                                           |
+| ---- | ---------------------------- | ----------------------------------------------------------------------------- |
+| 1    | `requirements.txt`           | Pin `azure-storage-blob` and `psycopg2-binary`                                |
+| 2    | `src/pipeline.py`            | Implement `get_config`, `upload_raw_to_blob`, `write_to_postgres` (Tasks 1-3) |
+| 3    | `Dockerfile`                 | Finish the cache-friendly image (Task 4)                                      |
+| 4    | Azure CLI                    | Deploy as a Container App Job (Task 4-5)                                      |
+| 5    | `docs/execution_history.png` | Add the Execution-history portal screenshot (Task 5)                          |
+| 6    | `AI_ASSIST.md`               | Fill in your AI prompt + review (Task 7)                                      |
 
 ## Open in Codespaces
 
@@ -82,17 +82,17 @@ The grader reports a score out of 100. The passing threshold is 60.
 
 ## Scoring ladder
 
-| Points | What the grader checks |
-|---|---|
-| 10 | Required files exist (Dockerfile, requirements.txt, src/pipeline.py, AI_ASSIST.md, docs/) |
-| 10 | requirements.txt pins `azure-storage-blob` and `psycopg2-binary` |
-| 10 | Dockerfile copies requirements before src (cache-friendly layer order) |
-| 15 | Pipeline reads both env vars, wraps the Postgres connection so it is closed cleanly, and silences the Azure SDK logger |
-| 15 | Pipeline uses an idempotent upsert (`ON CONFLICT ... DO UPDATE`) |
-| 10 | Connection string uses the Azure-required SSL flag and the blob SDK client class |
-| 10 | AI_ASSIST.md has all three sections and is filled in (>=1800 chars, no `TODO:`) |
-| 10 | README has a `## Verification` heading and references an image in `docs/` |
-| 10 | `docs/execution_history.png` exists and is non-trivial (real screenshot) |
+| Points | What the grader checks                                                                                                 |
+| ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| 10     | Required files exist (Dockerfile, requirements.txt, src/pipeline.py, AI_ASSIST.md, docs/)                              |
+| 10     | requirements.txt pins `azure-storage-blob` and `psycopg2-binary`                                                       |
+| 10     | Dockerfile copies requirements before src (cache-friendly layer order)                                                 |
+| 15     | Pipeline reads both env vars, wraps the Postgres connection so it is closed cleanly, and silences the Azure SDK logger |
+| 15     | Pipeline uses an idempotent upsert (`ON CONFLICT ... DO UPDATE`)                                                       |
+| 10     | Connection string uses the Azure-required SSL flag and the blob SDK client class                                       |
+| 10     | AI_ASSIST.md has all three sections and is filled in (>=1800 chars, no `TODO:`)                                        |
+| 10     | README has a `## Verification` heading and references an image in `docs/`                                              |
+| 10     | `docs/execution_history.png` exists and is non-trivial (real screenshot)                                               |
 
 ## Submitting
 
@@ -108,3 +108,17 @@ repo (`Data Track/Week 6/week_6__8_assignment.md`). The auto-grader checks
 code shape, not live Azure deployment, because the GitHub Actions runner has
 no Azure credentials. To rebuild from a fresh scaffold, follow
 `.agents/workflows/build_assignment_repo.md` in the curriculum repo.
+
+## Verification
+
+The Container App Job ran successfully.
+
+Execution history screenshot:
+
+![Execution history](docs/execution_history.png)
+
+CLI output is saved in:
+
+```text
+docs/execution_history.txt
+```
