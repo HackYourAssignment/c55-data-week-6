@@ -7,4 +7,4 @@
 # with explicit pins.
 
 azure-storage-blob==12.29.0
-psycopg2-binary==2.9.0
+psycopg2-binary==2.9.10
