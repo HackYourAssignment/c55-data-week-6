@@ -70,6 +70,12 @@ After deploying the Container App Job and triggering a run, capture proof:
    your screenshot using a Markdown image link. The grader looks for the
    `## Verification` heading and a `![alt](docs/your-file.png)` reference
    pointing at the image you committed.
+## Verification
+
+The pipeline has been successfully deployed as an Azure Container App Job and executed.
+Below is the proof of the successful run from the Azure Portal execution history:
+
+![Azure Job Execution Success](docs/execution_history.png)
 
 ## Check your score locally
 

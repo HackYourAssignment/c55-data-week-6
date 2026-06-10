@@ -12,10 +12,10 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # TODO Task 4: copy requirements.txt (must appear before any COPY src command)
-
+COPY requirements.txt .
 # TODO Task 4: install dependencies with pip
-
+RUN pip install --no-cache-dir -r requirements.txt
 # TODO Task 4: copy the src/ folder
-
+COPY src/ src
 # TODO Task 4: set the CMD to run the pipeline (python -m src.pipeline)
-CMD ["python", "-c", "raise SystemExit('Dockerfile not finished: Task 4 still pending')"]
+CMD ["python", "-m", "src.pipeline"]
