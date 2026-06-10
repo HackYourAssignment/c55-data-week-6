@@ -7,7 +7,8 @@
 # with explicit pins.
 
 # TODO: pin azure-storage-blob (uncomment and add a version)
-# azure-storage-blob==
+azure-storage-blob==12.19.0
 
 # TODO: pin psycopg2-binary (uncomment and add a version)
-# psycopg2-binary==
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0

@@ -13,15 +13,25 @@ Reference chapters:
 - Container Job:    Data Track/Week 6/week_6__5_container_apps_jobs.md
 """
 
+import json
 import logging
 import os
 from datetime import date
+from azure.storage.blob import BlobServiceClient
+from azure.core.exceptions import ResourceExistsError
+import psycopg2
+from contextlib import closing
+from dotenv import load_dotenv
+
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 # TASK 3 hint: quiet the Azure SDK so its DEBUG output does not drown your own
 # pipeline logs. The right call lives in Chapter 5 (Viewing logs).
+logging.getLogger("azure").setLevel(logging.WARNING)
+
+load_dotenv()
 
 
 def get_config() -> dict:
@@ -31,15 +41,27 @@ def get_config() -> dict:
         - POSTGRES_URL: full Azure Postgres connection string.
         - AZURE_STORAGE_CONNECTION_STRING: blob storage account connection string.
 
+        
     Optional:
         - SOURCE_NAME: logical source label, default "weather".
         - LOG_LEVEL: not parsed here; the orchestrator sets it via env var.
 
     Raise RuntimeError with a clear message if a required variable is missing.
     """
-    raise NotImplementedError(
-        "Task 3: read POSTGRES_URL and AZURE_STORAGE_CONNECTION_STRING from os.environ"
-    )
+    source_name = os.getenv("SOURCE_NAME", "weather")
+    POSTGRES_URL = os.getenv("POSTGRES_URL")
+    AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+
+    if not POSTGRES_URL:
+        raise RuntimeError("Environment variable 'POSTGRES_URL' is not set")
+    if not AZURE_STORAGE_CONNECTION_STRING:
+        raise RuntimeError("Environment variable 'AZURE_STORAGE_CONNECTION_STRING' is not set")
+
+    return {
+        "source_name": source_name,
+        "postgres_url": POSTGRES_URL,
+        "azure_storage_connection_string": AZURE_STORAGE_CONNECTION_STRING,
+    }
 
 
 def fetch_records() -> list[dict]:
@@ -49,7 +71,29 @@ def fetch_records() -> list[dict]:
     one dict with a stable key set (for example: station, timestamp,
     temperature_c, humidity_pct).
     """
-    raise NotImplementedError("Task 3: return a list of at least one record")
+    logger.info("fetching records from source API") 
+
+    return [
+        {
+            "station": "Amsterdam",
+            "timestamp": "2026-06-09T06:00:00Z",
+            "temperature_c": 17.4,
+            "humidity_pct": 72,
+        },
+        {
+            "station": "Rotterdam",
+            "timestamp": "2026-06-09T06:00:00Z",
+            "temperature_c": 16.8,
+            "humidity_pct": 68,
+        },
+        {
+            "station": "Almere",
+            "timestamp": "2026-06-09T06:00:00Z",
+            "temperature_c": 15.9,
+            "humidity_pct": 75,
+        },
+    ]
+
 
 
 def upload_raw_to_blob(records: list[dict], blob_conn_str: str, source: str) -> str:
@@ -62,7 +106,28 @@ def upload_raw_to_blob(records: list[dict], blob_conn_str: str, source: str) -> 
     teacher has pre-created it). Overwrite if the blob already exists so
     same-day reruns succeed.
     """
-    raise NotImplementedError("Task 1 + Task 3: upload records to blob storage")
+    logger.info("connecting to blob service")
+    blob_service_client = BlobServiceClient.from_connection_string(blob_conn_str)
+
+    container_name = "raw"
+    blob_path = f"{source}/{date.today().isoformat()}.json"
+
+    # Ensure the container exists so uploads don't fail with PathNotFoundError.
+    try:
+        logger.info("ensuring container '%s' exists", container_name)
+        blob_service_client.create_container(container_name)
+    except ResourceExistsError:
+        pass
+    except Exception:
+        logger.exception("failed to create or access container '%s'", container_name)
+        raise
+
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_path)
+
+    # Always upload and overwrite same-day blobs so reruns succeed.
+    logger.info("uploading blob %s (overwrite=true)", blob_path)
+    blob_client.upload_blob(data=json.dumps(records), overwrite=True)
+    return blob_path
 
 
 def write_to_postgres(records: list[dict], postgres_url: str) -> int:
@@ -78,7 +143,47 @@ def write_to_postgres(records: list[dict], postgres_url: str) -> int:
 
     See Chapter 4 for the connection-and-cursor pattern this is based on.
     """
-    raise NotImplementedError("Task 2 + Task 3: insert rows into Azure Postgres")
+
+    with closing(psycopg2.connect(postgres_url)) as conn:
+        with conn.cursor() as cur:
+            cur.execute("DROP TABLE IF EXISTS weather_readings")
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS weather_readings (
+                    station TEXT NOT NULL,
+                    timestamp TIMESTAMPTZ NOT NULL,
+                    temperature_c REAL NOT NULL,
+                    humidity_pct INTEGER NOT NULL,
+                    PRIMARY KEY (station, timestamp)
+                )
+                """
+            )
+
+            insert_sql = """
+                INSERT INTO weather_readings (
+                    station,
+                    timestamp,
+                    temperature_c,
+                    humidity_pct
+                ) VALUES (%s, %s, %s, %s)
+                ON CONFLICT (station, timestamp) DO UPDATE SET
+                    temperature_c = EXCLUDED.temperature_c,
+                    humidity_pct = EXCLUDED.humidity_pct
+            """
+
+            for record in records:
+                cur.execute(
+                    insert_sql,
+                    (
+                        record["station"],
+                        record["timestamp"],
+                        record["temperature_c"],
+                        record["humidity_pct"],
+                    ),
+                )
+        conn.commit()
+
+    return len(records)
 
 
 def run() -> None:
