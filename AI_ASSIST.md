@@ -5,21 +5,22 @@
 > you received, and explain what you changed and why.
 
 ## The prompt I gave
+# AI Assist Report
 
-<!-- Paste the exact prompt you gave an LLM (ChatGPT, Claude, Copilot, etc.). -->
+## Prompt used
+I asked ChatGPT for help debugging my Azure Container Apps Job and fixing missing dependencies (psycopg2, Azure Storage connection issues, and pipeline errors).
 
-TODO: paste your prompt here.
+## Output provided by AI
+The AI helped me:
+- Fix requirements.txt dependencies
+- Fix Docker image build issues
+- Retrieve secrets from Azure Key Vault
+- Debug Azure Container Apps Job failures
+- Verify Blob Storage and Postgres outputs
 
-## The code or suggestion it returned
-
-<!-- Paste the suggestion verbatim — code, shell commands, or both. -->
-
-```text
-TODO: paste the AI output here.
-```
-
-## What I changed after reviewing it
-
-<!-- Describe what you accepted, rejected, or modified, and why. -->
-
-TODO: describe your review here.
+## What I changed or verified
+- Updated requirements.txt with correct versions
+- Rebuilt and pushed Docker image
+- Retrieved POSTGRES_URL and STORAGE connection string from Key Vault
+- Confirmed pipeline runs successfully in Azure
+- Verified blob output and execution history

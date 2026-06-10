@@ -11,11 +11,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# TODO Task 4: copy requirements.txt (must appear before any COPY src command)
+# 1. Copy requirements first
+COPY requirements.txt .
 
-# TODO Task 4: install dependencies with pip
+# 2. Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# TODO Task 4: copy the src/ folder
+# 3. Copy source code
+COPY src/ src/
 
-# TODO Task 4: set the CMD to run the pipeline (python -m src.pipeline)
-CMD ["python", "-c", "raise SystemExit('Dockerfile not finished: Task 4 still pending')"]
+# 4. Set environment for python path
+ENV PYTHONPATH=/app
+
+# 5. Run pipeline
+CMD ["python", "src/pipeline.py"]
