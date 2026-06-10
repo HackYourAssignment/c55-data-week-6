@@ -13,12 +13,21 @@ Reference chapters:
 - Container Job:    Data Track/Week 6/week_6__5_container_apps_jobs.md
 """
 
+import csv
+import io
+import json
 import logging
 import os
 from datetime import date
+from zipfile import Path
+import psycopg2
+from azure.storage.blob import BlobServiceClient
+from contextlib import closing
+
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+
 
 # TASK 3 hint: quiet the Azure SDK so its DEBUG output does not drown your own
 # pipeline logs. The right call lives in Chapter 5 (Viewing logs).
@@ -62,7 +71,12 @@ def upload_raw_to_blob(records: list[dict], blob_conn_str: str, source: str) -> 
     teacher has pre-created it). Overwrite if the blob already exists so
     same-day reruns succeed.
     """
-    raise NotImplementedError("Task 1 + Task 3: upload records to blob storage")
+    service = BlobServiceClient.from_connection_string(blob_conn_str)
+    container = service.get_container_client("raw")
+    data = json.dumps(records)
+    blob_name = f"raw/{source}/{date.today().isoformat()}.json"
+    container.upload_blob(name=blob_name, data=data, overwrite=True)
+    return blob_name
 
 
 def write_to_postgres(records: list[dict], postgres_url: str) -> int:
@@ -78,7 +92,6 @@ def write_to_postgres(records: list[dict], postgres_url: str) -> int:
 
     See Chapter 4 for the connection-and-cursor pattern this is based on.
     """
-    raise NotImplementedError("Task 2 + Task 3: insert rows into Azure Postgres")
 
 
 def run() -> None:
