@@ -6,20 +6,21 @@
 
 ## The prompt I gave
 
-<!-- Paste the exact prompt you gave an LLM (ChatGPT, Claude, Copilot, etc.). -->
-
-TODO: paste your prompt here.
+I used ChatGPT to help me understand Azure Blob Storage, Azure PostgreSQL, Docker images, and Azure Container App Jobs. I also asked for help troubleshooting deployment errors, Docker package issues, Azure CLI commands, and job execution failures.
 
 ## The code or suggestion it returned
 
-<!-- Paste the suggestion verbatim — code, shell commands, or both. -->
-
 ```text
-TODO: paste the AI output here.
+ChatGPT explained Azure concepts, suggested debugging steps, helped interpret error messages, explained missing Python package errors, and provided examples of Azure CLI commands for deployment, verification, and troubleshooting.
 ```
 
 ## What I changed after reviewing it
 
-<!-- Describe what you accepted, rejected, or modified, and why. -->
+I verified:
 
-TODO: describe your review here.
+- the required Python packages were installed correctly;
+- the Docker image built successfully;
+- the image was pushed to Azure Container Registry;
+- the Azure Container App Job was created and executed successfully;
+- a JSON file was uploaded to Azure Blob Storage;
+- the execution history showed a successful run.
