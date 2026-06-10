@@ -59,6 +59,7 @@ python -m src.pipeline
 ```
 
 ## Verifying your deployment (Task 5)
+## Verification
 
 After deploying the Container App Job and triggering a run, capture proof:
 
