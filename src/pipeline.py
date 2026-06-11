@@ -5,7 +5,6 @@ targets: raw JSON in Azure Blob Storage and structured rows in Azure
 Database for PostgreSQL. When you finish the assignment it will run as a
 Container App Job triggered from the Azure Portal or the CLI.
 
-Replace every `raise NotImplementedError` below with a real implementation.
 
 Reference chapters:
 - Blob upload:      Data Track/Week 6/week_6__3_azure_blob_storage.md
@@ -18,6 +17,7 @@ import logging
 import os
 from datetime import date
 import sys
+from tkinter import ON
 from zipfile import Path
 import psycopg2
 from azure.storage.blob import BlobServiceClient
@@ -52,7 +52,6 @@ def get_config() -> dict:
         - SOURCE_NAME: logical source label, default "weather".
         - LOG_LEVEL: not parsed here; the orchestrator sets it via env var.
 
-    Raise RuntimeError with a clear message if a required variable is missing.
     """
     POSTGRES_URL = os.environ.get("POSTGRES_URL")
     AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
@@ -66,9 +65,8 @@ def get_config() -> dict:
     if not SOURCE_NAME:
         missing.append("SOURCE_NAME")
     if missing:
-        print(
-            f"Error: missing environment variable(s): {', '.join(missing)}",
-            file=sys.stderr,
+        raise RuntimeError(
+            f"Error: missing environment variable(s): {', '.join(missing)}"
         )
         sys.exit(1)
     return {
@@ -137,15 +135,24 @@ def write_to_postgres(records: list[dict], postgres_url: str) -> int:
             cur.execute("CREATE SCHEMA IF NOT EXISTS dev_bader;")
             cur.execute("SET search_path TO dev_bader;")
             cur.execute(CREATE_WEATHER_READINGS_SQL)
-            for row in records:
+            for r in records:
                 cur.execute(
                     """
-                        INSERT INTO weather_readings (station, timestamp, temperature_c)
-                        VALUES (%s, %s, %s)
-                        """,
-                    (row["station"], row["timestamp"], float(row["temperature_c"])),
+                 INSERT INTO weather_readings (station, timestamp, temperature_c, humidity_pct)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (station, timestamp) DO UPDATE SET
+                temperature_c = EXCLUDED.temperature_c,
+                humidity_pct = EXCLUDED.humidity_pct,
+                ingested_at = NOW()
+                """,
+                    (
+                        r["station"],
+                        r["timestamp"],
+                        r["temperature_c"],
+                        r["humidity_pct"],
+                    ),
                 )
-                conn.commit()
+            conn.commit()
             return len(records)
 
 
