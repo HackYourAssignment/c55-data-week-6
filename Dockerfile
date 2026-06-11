@@ -16,6 +16,8 @@ WORKDIR /app
 # TODO Task 4: install dependencies with pip
 
 # TODO Task 4: copy the src/ folder
-
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY src/ ./src/
 # TODO Task 4: set the CMD to run the pipeline (python -m src.pipeline)
-CMD ["python", "-c", "raise SystemExit('Dockerfile not finished: Task 4 still pending')"]
+CMD ["python", "-m", "src.pipeline"]
