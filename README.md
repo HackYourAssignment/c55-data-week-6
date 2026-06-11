@@ -108,3 +108,32 @@ repo (`Data Track/Week 6/week_6__8_assignment.md`). The auto-grader checks
 code shape, not live Azure deployment, because the GitHub Actions runner has
 no Azure credentials. To rebuild from a fresh scaffold, follow
 `.agents/workflows/build_assignment_repo.md` in the curriculum repo.
+
+## Verification
+
+run using python -m src.pipeline
+verify using:
+
+cur = conn.cursor()
+
+# Count rows
+cur.execute("SELECT COUNT(*) FROM weather_readings")
+count = cur.fetchone()[0]
+print(f"Total rows: {count}")
+
+# Sample recent rows
+cur.execute("""
+    SELECT station, timestamp, temperature_c
+    FROM weather_readings
+    ORDER BY ingested_at DESC
+    LIMIT 2
+""")
+for row in cur.fetchall():
+    print(row)
+
+cur.close()
+
+OR using databeaver/bash using postgres link
+Blob can be found in azure
+
+expect 2 rows written to postgres
