@@ -7,8 +7,56 @@ on:
 
 jobs:
   grade:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
       pull-requests: write
-    uses: HackYourFuture/github-actions/.github/workflows/auto-grade.yml@main
+
+    steps:
+      - name: Checkout assignment code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: assignment
+
+      - name: Checkout base repo for authoritative grader
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          path: base-repo
+
+      - name: Overlay authoritative grader
+        run: cp -r base-repo/.hyf/. assignment/.hyf/
+
+      - name: Checkout workflow scripts
+        uses: actions/checkout@v6
+        with:
+          repository: HackYourFuture/github-actions
+          path: workflow-scripts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "lts/*"
+
+      - name: Run tests
+        working-directory: assignment/.hyf
+        run: bash test.sh > test-output.txt 2>&1
+
+      - name: Comment PR
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const path = require('path');
+            const run = require(path.join(process.env.GITHUB_WORKSPACE, 'workflow-scripts/workflow-scripts/comment-pr.js'));
+            process.chdir(path.join(process.env.GITHUB_WORKSPACE, 'assignment'));
+            await run({ github, context, core });
+
+      - name: Fail if tests failed
+        run: |
+          PASS=$(jq -r '.pass' assignment/.hyf/score.json)
+          if [ "$PASS" != "true" ]; then
+            exit 1
+          fi
