@@ -16,9 +16,6 @@ import json
 import logging
 import os
 from datetime import date
-import sys
-from tkinter import ON
-from zipfile import Path
 import psycopg2
 from azure.storage.blob import BlobServiceClient
 from contextlib import closing
@@ -29,13 +26,16 @@ logger = logging.getLogger(__name__)
 logging.getLogger("azure").setLevel(logging.WARNING)
 
 CREATE_WEATHER_READINGS_SQL = """
-CREATE TABLE IF NOT EXISTS weather_readings (
-    id SERIAL PRIMARY KEY,
-    station TEXT NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    temperature_c DOUBLE PRECISION NOT NULL
-)
-"""
+        CREATE TABLE IF NOT EXISTS weather_readings (
+            id SERIAL PRIMARY KEY,
+            station TEXT NOT NULL,
+            timestamp TIMESTAMPTZ NOT NULL,
+            temperature_c DOUBLE PRECISION NOT NULL,
+            humidity_pct INTEGER NOT NULL,
+            ingested_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(station, timestamp)
+        )
+    """
 
 # TASK 3 hint: quiet the Azure SDK so its DEBUG output does not drown your own
 # pipeline logs. The right call lives in Chapter 5 (Viewing logs).
@@ -68,7 +68,6 @@ def get_config() -> dict:
         raise RuntimeError(
             f"Error: missing environment variable(s): {', '.join(missing)}"
         )
-        sys.exit(1)
     return {
         "postgres_url": POSTGRES_URL,
         "azure_storage_connection_string": AZURE_STORAGE_CONNECTION_STRING,
@@ -81,20 +80,20 @@ def fetch_records() -> list[dict]:
 
     In a real pipeline you would call an API here. Return a list of at least
     one dict with a stable key set (for example: station, timestamp,
-    temperature_c, humidity_pct).
+    temperature_c).
     """
     return [
         {
             "station": "STATION_1",
             "timestamp": "2024-06-01T12:00:00Z",
             "temperature_c": 25.0,
-            "humidity_pct": 60.0,
+            "humidity_pct": 60,
         },
         {
             "station": "STATION_2",
             "timestamp": "2024-06-01T12:05:00Z",
             "temperature_c": 26.5,
-            "humidity_pct": 55.0,
+            "humidity_pct": 65,
         },
     ]
 
