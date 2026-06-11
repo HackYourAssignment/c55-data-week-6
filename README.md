@@ -71,6 +71,14 @@ After deploying the Container App Job and triggering a run, capture proof:
    `## Verification` heading and a `![alt](docs/your-file.png)` reference
    pointing at the image you committed.
 
+## Verification
+
+ Job executed successfully in Azure Container Apps Jobs
+ Blob created in Azure Storage container `raw/weather/2026-06-09.json`
+ PostgreSQL table `weather_readings` contains expected rows
+ Execution history saved in `docs/execution_history.txt`
+ See docs/execution_history.png
+
 ## Check your score locally
 
 ```bash
