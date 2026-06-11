@@ -274,9 +274,10 @@ fi
 pass "Level 9: execution screenshot ($l9/10 pts)"
 
 # ── Code hygiene warnings (no points; just feedback) ────────────────────────
-check_no_print_statements "$REPO_ROOT/src" "src/"
-check_gitignore_python "$REPO_ROOT/.gitignore"
+check_no_print_statements "$REPO_ROOT/src" "src/" || true
+check_gitignore_python "$REPO_ROOT/.gitignore" || true
 
 # ── Final result ────────────────────────────────────────────────────────────
 print_results "Week 6 Autograder"
 write_score "$score" "$PASSING" "$SCRIPT_DIR/score.json"
+
